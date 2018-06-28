@@ -14,7 +14,6 @@ def pg_start_backup(conn,methenv):
     cursor = conn.cursor()
     pg_start_backup = "SELECT pg_start_backup('%s_%s', true, true)" % (methenv, tstamp)
     cursor.execute(pg_start_backup)
-    cursor.execute("CHECKPOIN")
 
 def pg_stop_backup(conn):
     cursor = conn.cursor()

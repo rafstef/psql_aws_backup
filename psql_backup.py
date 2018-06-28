@@ -11,7 +11,7 @@ import json
 import socket
 import sys
 import string
-#from psql import *
+from psql import *
 from datetime import datetime
 import logging as log
 
@@ -28,7 +28,7 @@ def create_snapshot(ec2, volumes_ids):
       volume = ec2.Volume(v)
     except Exception as e:
       log.error("%s" % e)
-      sys.exit(1) 
+      sys.exit(1)
     name = None
     for tag in volume.tags:
       if tag['Key'] == 'Name':
@@ -61,7 +61,7 @@ def create_snapshot(ec2, volumes_ids):
       log.info("Create snapshot %s" % response)
     except Exception as e:
       log.error("%s" % e)
-      sys.exit(1) 
+      sys.exit(1)
 
 def find_psql_volumes(ec2, instance):
   psql_volumes_ids = []
@@ -76,25 +76,25 @@ def find_psql_volumes(ec2, instance):
       volume = ec2.Volume(v['Ebs']['VolumeId'])
     except Exception as e:
       log.error("%s" % e)
-      sys.exit(1) 
+      sys.exit(1)
     volume_name = None
     volume_complete_name = None
     for tag in volume.tags:
       if tag['Key'] == 'Name':
         volume_complete_name = str(tag['Value'])
-        volume_name=str(volume_complete_name.split("_")[0])   
+        volume_name=str(volume_complete_name.split("_")[0])
     pattern = "psql::%s" % instancename
     if pattern.lower() == volume_name.lower():
       psql_volumes_ids.append(volume.id)
   return psql_volumes_ids
 
 def find_all_volume_snapshots(volume_id):
-  try: 
+  try:
     client=boto3.client('ec2')
-    r = client.describe_snapshots(Filters= [{'Name': 'tag:Type', 'Values': ['ha_backup']},{'Name': 'tag:Volume-id', 'Values': [volume_id]}])     
+    r = client.describe_snapshots(Filters= [{'Name': 'tag:Type', 'Values': ['ha_backup']},{'Name': 'tag:Volume-id', 'Values': [volume_id]}])
     return r
   except Exception as e:
-    log.error("%s" % e) 
+    log.error("%s" % e)
     sys.exit(1)
 
 def order_snapshots(snapshots):
@@ -126,19 +126,20 @@ def delete_old_snaphots(ec2,snaphots):
         log.error("Volume snapshot delete error %s" % (e))
 
 
-def main():
-  #if len(args) != 6:
-  #  print("db_host,db_name,db_user,db_password,methenv,retention")
-  #  sys.exit(1)
-  #else:
-    #conn = psql_open_connection(args[0],args[1],args[2],args[3])
-    #methenv = args[4]
-    retention = 2
-    #pg_start_backup(conn, methenv)
-
-    #hostname= socket.gethostname()
-
-    hostname = "TCCAUSV1APL-EDICORE01"
+def main(args):
+  if len(args) != 6:
+    print("db_host,db_name,db_user,db_password,methenv,retention")
+    sys.exit(1)
+  else:
+    db_hostname = args[0]
+    db_name = args[1]
+    db_user=args[2]
+    db_password = args[3]
+    methenv = args[4]
+    retention = args[5]
+    conn = psql_open_connection(db_hostname, db_name, db_user,db_password)
+    pg_start_backup(conn, methenv)
+    hostname= socket.gethostname()
     log.info("%s", hostname)
     inst_id = urllib2.urlopen("http://169.254.169.254/latest/meta-data/instance-id").read()
     response = urllib2.urlopen("http://169.254.169.254/latest/dynamic/instance-identity/document").read()
@@ -150,11 +151,11 @@ def main():
     psql_volumes_ids = find_psql_volumes(ec2, instance)
     log.info("Volume ids to backup: %s" % psql_volumes_ids)
     create_snapshot(ec2,psql_volumes_ids)
+    pg_stop_backup()
     s = snapshots_to_remove(psql_volumes_ids,retention)
     delete_old_snaphots(ec2,s)
-    
+
 if __name__ == '__main__':
-#  main(sys.argv[1:])
-  main()
+  main(sys.argv[1:])
 
 
